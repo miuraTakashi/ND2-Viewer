@@ -1,0 +1,1076 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ND2 File Viewer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .content {
+            display: flex;
+            min-height: 600px;
+        }
+        .sidebar {
+            width: 300px;
+            background: #ecf0f1;
+            padding: 20px;
+            border-right: 1px solid #bdc3c7;
+        }
+        .main-view {
+            flex: 1;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+        .upload-area {
+            border: 2px dashed #3498db;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 20px;
+            background: #f8f9fa;
+        }
+        .upload-area.dragover {
+            background: #e3f2fd;
+            border-color: #2196f3;
+        }
+        .file-input {
+            margin: 10px 0;
+        }
+        .control-group {
+            margin-bottom: 20px;
+        }
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .slider {
+            width: 100%;
+            margin: 10px 0;
+        }
+        .slider:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            width: calc(100% - 10px);
+        }
+        .button:hover {
+            background: #2980b9;
+        }
+        .button:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+        }
+        .image-container {
+            flex: 1;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+            overflow: auto;
+            background: #2c3e50;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 400px;
+        }
+        .image-display {
+            max-width: 100%;
+            max-height: 100%;
+        }
+        .metadata {
+            font-size: 12px;
+            line-height: 1.4;
+            background: white;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+            padding: 10px;
+            margin-top: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            display: none;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .hidden {
+            display: none;
+        }
+        .channel-colors {
+            margin-top: 5px;
+            font-size: 11px;
+        }
+        .color-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 3px;
+        }
+        .color-box {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+            border: 1px solid #ccc;
+        }
+        .color-box.blue {
+            background-color: #0066ff;
+        }
+        .color-box.green {
+            background-color: #00cc00;
+        }
+        .color-box.red {
+            background-color: #ff0000;
+        }
+        .color-box.magenta {
+            background-color: #ff00ff;
+        }
+        .color-box.gray {
+            background-color: #808080;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>ND2 File Viewer</h1>
+            <p>Open, view, and export Nikon ND2 microscopy files</p>
+        </div>
+        
+        <div class="content">
+            <div class="sidebar">
+                <div class="upload-area" id="uploadArea">
+                    <h3>Upload ND2 File</h3>
+                    <input type="file" id="fileInput" accept=".nd2" class="file-input">
+                    <p>Or drag and drop an ND2 file here</p>
+                </div>
+                
+                <div id="controls" class="hidden">
+                    <div class="control-group">
+                        <label>Channel: <span id="channelLabel">1/1</span></label>
+                        <input type="range" id="channelSlider" class="slider" min="0" max="0" value="0">
+                        <input type="color" id="channelColorPicker" value="#0080ff" title="Select color for current channel" style="margin-left: 10px; width: 35px; height: 25px; border: 1px solid #ccc; border-radius: 3px;">
+                        <button onclick="resetChannelColors()" style="margin-left: 5px; padding: 2px 8px; font-size: 11px; border: 1px solid #ccc; border-radius: 3px; background: #f8f9fa; cursor: pointer;" title="Reset to default colors">Reset</button>
+                        <div class="channel-colors">
+                            <div id="colorLegend" class="color-legend">
+                                <!-- Dynamic color legend will be populated here -->
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label>Time: <span id="timeLabel">1/1</span></label>
+                        <input type="range" id="timeSlider" class="slider" min="0" max="0" value="0">
+                    </div>
+                    
+                    <div class="control-group">
+                        <label>Z-Slice: <span id="zLabel">1/1</span></label>
+                        <input type="range" id="zSlider" class="slider" min="0" max="0" value="0">
+                    </div>
+                    
+                    <div class="control-group">
+                        <label>Contrast Min: <span id="contrastMinLabel">0</span></label>
+                        <input type="range" id="contrastMinSlider" class="slider" min="0" max="65535" value="0">
+                    </div>
+                    
+                    <div class="control-group">
+                        <label>Contrast Max: <span id="contrastMaxLabel">255</span></label>
+                        <input type="range" id="contrastMaxSlider" class="slider" min="0" max="65535" value="255">
+                    </div>
+                    
+                    <button class="button" onclick="autoContrast()">Auto Contrast</button>
+                    
+                    <div class="control-group">
+                        <button class="button" onclick="exportFrame()">Export Current Frame</button>
+                        <button class="button" onclick="exportChannel()">Export Channel</button>
+                        <button class="button" onclick="exportAll()">Export All Channels</button>
+                    </div>
+                    
+                    <div class="control-group">
+                        <button class="button" onclick="toggleMetadata()">Show/Hide Metadata</button>
+                    </div>
+                    
+                    <div class="control-group">
+                        <button class="button" onclick="shutdownServer()" style="background: #e74c3c; margin-top: 20px;">
+                            🛑 Quit ND2 Viewer
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="metadata" class="metadata hidden"></div>
+            </div>
+            
+            <div class="main-view">
+                <div id="status" class="status"></div>
+                
+                <div class="image-container">
+                    <img id="imageDisplay" class="image-display hidden" alt="ND2 Image">
+                    <div id="placeholder" style="color: #7f8c8d; text-align: center;">
+                        <h3>No Image Loaded</h3>
+                        <p>Upload an ND2 file to begin viewing</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let currentMetadata = null;
+        
+        // Default color mapping for channels
+        const defaultChannelColors = {
+            0: '#0080ff', // Blue
+            1: '#00cc00', // Green  
+            2: '#ff0000', // Red
+            3: '#ff00ff', // Magenta
+            4: '#808080'  // Gray
+        };
+        
+        // Current custom colors (will be initialized from defaults)
+        let channelColors = {...defaultChannelColors};
+        
+        // File upload handling
+        const fileInput = document.getElementById('fileInput');
+        const uploadArea = document.getElementById('uploadArea');
+        
+        fileInput.addEventListener('change', handleFileSelect);
+        
+        // Drag and drop
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                uploadFile(files[0]);
+            }
+        });
+        
+        function handleFileSelect(e) {
+            const file = e.target.files[0];
+            if (file) {
+                uploadFile(file);
+            }
+        }
+        
+        function uploadFile(file) {
+            if (!file.name.toLowerCase().endsWith('.nd2')) {
+                showStatus('Please select an ND2 file', 'error');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            showStatus('Loading ND2 file...', 'success');
+            
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    currentMetadata = data.metadata;
+                    setupControls();
+                    updateFrame();
+                    setTimeout(showMetadata, 100); // Show metadata after a brief delay
+                    showStatus('Loaded: ' + data.filename, 'success');
+                } else {
+                    showStatus(data.error, 'error');
+                }
+            })
+            .catch(error => {
+                showStatus('Failed to upload file: ' + error, 'error');
+            });
+        }
+        
+        function setupControls() {
+            const controls = document.getElementById('controls');
+            controls.classList.remove('hidden');
+            
+            const sizes = currentMetadata.sizes;
+            
+            // Setup channel control
+            const channelSlider = document.getElementById('channelSlider');
+            if (sizes.C) {
+                channelSlider.max = sizes.C - 1;
+                channelSlider.value = 0;
+                updateLabel('channelLabel', 1, sizes.C);
+            } else {
+                channelSlider.max = 0;
+                updateLabel('channelLabel', 'N/A', 'N/A');
+            }
+            
+            // Setup time control
+            const timeSlider = document.getElementById('timeSlider');
+            if (sizes.T) {
+                timeSlider.max = sizes.T - 1;
+                timeSlider.value = 0;
+                updateLabel('timeLabel', 1, sizes.T);
+            } else {
+                timeSlider.max = 0;
+                updateLabel('timeLabel', 'N/A', 'N/A');
+            }
+            
+            // Setup Z control
+            const zSlider = document.getElementById('zSlider');
+            const zControlGroup = zSlider.closest('.control-group');
+            if (sizes.Z && sizes.Z > 1) {
+                // Multiple Z-slices available
+                zSlider.max = sizes.Z - 1;
+                zSlider.value = 0;
+                updateLabel('zLabel', 1, sizes.Z);
+                zControlGroup.style.display = 'block';
+                zSlider.disabled = false;
+            } else {
+                // No Z-slices or only 1 Z-slice (2D image)
+                zSlider.max = 0;
+                zSlider.value = 0;
+                updateLabel('zLabel', 'N/A', 'N/A');
+                zControlGroup.style.display = 'none'; // Hide the entire control group
+                zSlider.disabled = true;
+            }
+            
+            // Add event listeners
+            document.getElementById('channelSlider').addEventListener('input', onChannelChange);
+            document.getElementById('timeSlider').addEventListener('input', onNavigationChange);
+            document.getElementById('zSlider').addEventListener('input', onNavigationChange);
+            document.getElementById('contrastMinSlider').addEventListener('input', onContrastChange);
+            document.getElementById('contrastMaxSlider').addEventListener('input', onContrastChange);
+            document.getElementById('channelColorPicker').addEventListener('input', onColorChange);
+            
+            // Initialize color legend and color picker
+            updateColorLegend();
+            updateColorPicker();
+        }
+        
+        function updateLabel(labelId, current, total) {
+            if (current === 'N/A') {
+                document.getElementById(labelId).textContent = 'N/A';
+            } else {
+                document.getElementById(labelId).textContent = current + '/' + total;
+            }
+        }
+        
+        function onChannelChange() {
+            updateNavigationLabels();
+            updateColorPicker();
+            updateFrame();
+        }
+        
+        function onNavigationChange() {
+            updateNavigationLabels();
+            updateFrame();
+        }
+        
+        function onColorChange() {
+            const channel = parseInt(document.getElementById('channelSlider').value);
+            const color = document.getElementById('channelColorPicker').value;
+            channelColors[channel] = color;
+            updateColorLegend();
+            updateFrame();
+        }
+        
+        function updateColorPicker() {
+            const channel = parseInt(document.getElementById('channelSlider').value);
+            const colorPicker = document.getElementById('channelColorPicker');
+            colorPicker.value = channelColors[channel] || defaultChannelColors[channel % 5];
+        }
+        
+        function updateColorLegend() {
+            if (!currentMetadata || !currentMetadata.sizes.C) return;
+            
+            const legend = document.getElementById('colorLegend');
+            legend.innerHTML = '';
+            
+            for (let i = 0; i < currentMetadata.sizes.C; i++) {
+                const color = channelColors[i] || defaultChannelColors[i % 5];
+                const legendItem = document.createElement('span');
+                legendItem.className = 'legend-item';
+                legendItem.innerHTML = `<span class="color-box" style="background-color: ${color};"></span>Ch${i + 1}`;
+                legend.appendChild(legendItem);
+            }
+        }
+        
+        function resetChannelColors() {
+            channelColors = {...defaultChannelColors};
+            updateColorLegend();
+            updateColorPicker();
+            updateFrame();
+        }
+        
+        function updateNavigationLabels() {
+            const sizes = currentMetadata.sizes;
+            
+            if (sizes.C) {
+                const channel = parseInt(document.getElementById('channelSlider').value);
+                updateLabel('channelLabel', channel + 1, sizes.C);
+            }
+            
+            if (sizes.T) {
+                const time = parseInt(document.getElementById('timeSlider').value);
+                updateLabel('timeLabel', time + 1, sizes.T);
+            }
+            
+            if (sizes.Z) {
+                const z = parseInt(document.getElementById('zSlider').value);
+                updateLabel('zLabel', z + 1, sizes.Z);
+            }
+        }
+        
+        function onContrastChange() {
+            const minVal = document.getElementById('contrastMinSlider').value;
+            const maxVal = document.getElementById('contrastMaxSlider').value;
+            
+            document.getElementById('contrastMinLabel').textContent = minVal;
+            document.getElementById('contrastMaxLabel').textContent = maxVal;
+            
+            updateFrame();
+        }
+        
+        function updateFrame() {
+            if (!currentMetadata) return;
+            
+            const channel = parseInt(document.getElementById('channelSlider').value);
+            const customColor = channelColors[channel];
+            
+            const params = new URLSearchParams({
+                channel: channel,
+                timepoint: document.getElementById('timeSlider').value,
+                z_slice: document.getElementById('zSlider').value,
+                contrast_min: document.getElementById('contrastMinSlider').value,
+                contrast_max: document.getElementById('contrastMaxSlider').value,
+                custom_color: customColor
+            });
+            
+            fetch('/get_frame?' + params.toString())
+            .then(response => response.json())
+            .then(data => {
+                if (data.image_data) {
+                    const imageDisplay = document.getElementById('imageDisplay');
+                    const placeholder = document.getElementById('placeholder');
+                    
+                    imageDisplay.src = data.image_data;
+                    imageDisplay.classList.remove('hidden');
+                    placeholder.style.display = 'none';
+                } else {
+                    showStatus(data.error, 'error');
+                }
+            })
+            .catch(error => {
+                showStatus('Failed to load frame: ' + error, 'error');
+            });
+        }
+        
+        function autoContrast() {
+            if (!currentMetadata) return;
+            
+            const params = new URLSearchParams({
+                channel: document.getElementById('channelSlider').value,
+                timepoint: document.getElementById('timeSlider').value,
+                z_slice: document.getElementById('zSlider').value,
+                contrast_min: 0,
+                contrast_max: 65535
+            });
+            
+            fetch('/get_frame?' + params.toString())
+            .then(response => response.json())
+            .then(data => {
+                if (data.auto_contrast_min !== undefined) {
+                    document.getElementById('contrastMinSlider').value = Math.round(data.auto_contrast_min);
+                    document.getElementById('contrastMaxSlider').value = Math.round(data.auto_contrast_max);
+                    onContrastChange();
+                }
+            });
+        }
+        
+        function exportFrame() {
+            if (!currentMetadata) return;
+            
+            const params = new URLSearchParams({
+                channel: document.getElementById('channelSlider').value,
+                timepoint: document.getElementById('timeSlider').value,
+                z_slice: document.getElementById('zSlider').value
+            });
+            
+            window.open('/export_frame?' + params.toString(), '_blank');
+        }
+        
+        function exportChannel() {
+            if (!currentMetadata) return;
+            
+            const params = new URLSearchParams({
+                channel: document.getElementById('channelSlider').value
+            });
+            
+            showStatus('Exporting channel...', 'success');
+            window.open('/export_channel?' + params.toString(), '_blank');
+        }
+        
+        function exportAll() {
+            if (!currentMetadata) return;
+            
+            showStatus('Exporting all channels...', 'success');
+            window.open('/export_all', '_blank');
+        }
+        
+        function showMetadata() {
+            const metadataDiv = document.getElementById('metadata');
+            metadataDiv.classList.remove('hidden');
+            
+            let html = '<h4>📁 File Information</h4>';
+            html += '<div style="margin-left: 10px;">';
+            html += '<strong>Filename:</strong> ' + currentMetadata.filename + '<br>';
+            html += '<strong>File Size:</strong> ' + (currentMetadata.file_size_mb || 'Unknown') + ' MB<br>';
+            html += '<strong>Data Type:</strong> ' + currentMetadata.dtype + '<br>';
+            html += '<strong>Shape:</strong> ' + currentMetadata.shape.join(' × ') + ' pixels<br>';
+            html += '<strong>Total Pixels:</strong> ' + (currentMetadata.total_pixels ? currentMetadata.total_pixels.toLocaleString() : 'Unknown') + '<br>';
+            html += '<strong>Estimated Memory:</strong> ' + (currentMetadata.estimated_memory_mb || 'Unknown') + ' MB<br>';
+            html += '</div><br>';
+            
+            // Enhanced Spatial Calibration Section (ImageJ-style)
+            html += '<h4>📏 Spatial Calibration</h4>';
+            html += '<div style="margin-left: 10px;">';
+            
+            if (currentMetadata.spatial_calibration) {
+                const spatial_cal = currentMetadata.spatial_calibration;
+                
+                // Show pixel size information prominently
+                if (spatial_cal.pixel_size_x_um) {
+                    html += '<strong>✅ Spatially Calibrated</strong><br>';
+                    html += '<div style="background-color: #e8f5e8; padding: 8px; border-radius: 4px; margin: 5px 0;">';
+                    
+                    // Pixel size information
+                    html += '<strong>Pixel Size:</strong><br>';
+                    html += '&nbsp;&nbsp;X: ' + spatial_cal.pixel_size_x_um + ' µm/pixel<br>';
+                    if (spatial_cal.pixel_size_y_um) {
+                        html += '&nbsp;&nbsp;Y: ' + spatial_cal.pixel_size_y_um + ' µm/pixel<br>';
+                    }
+                    if (spatial_cal.pixel_size_z_um) {
+                        html += '&nbsp;&nbsp;Z: ' + spatial_cal.pixel_size_z_um + ' µm/pixel<br>';
+                    }
+                    html += '&nbsp;&nbsp;Units: ' + spatial_cal.units + '<br>';
+                    
+                    // Axes calibration status
+                    if (spatial_cal.axes_calibrated) {
+                        html += '<strong>Axes Calibrated:</strong> [X,Y,Z] = [' + 
+                                spatial_cal.axes_calibrated.map(cal => cal ? '✓' : '✗').join(',') + ']<br>';
+                    }
+                    
+                    // Calibration source
+                    if (spatial_cal.calibration_source) {
+                        html += '<strong>Source:</strong> ' + spatial_cal.calibration_source + '<br>';
+                    }
+                    
+                    html += '</div>';
+                } else {
+                    html += '<strong>❌ Not Spatially Calibrated</strong><br>';
+                    html += '<div style="background-color: #fdf2e9; padding: 8px; border-radius: 4px; margin: 5px 0;">';
+                    html += '<em>No pixel size calibration found in file metadata.</em><br>';
+                    html += '<em>Physical measurements will not be available.</em>';
+                    html += '</div>';
+                }
+                
+                // Objective information (if available)
+                if (spatial_cal.objective) {
+                    const obj = spatial_cal.objective;
+                    html += '<br><strong>🔬 Objective Information:</strong><br>';
+                    html += '<div style="background-color: #f8f9fa; padding: 8px; border-radius: 4px; margin: 5px 0;">';
+                    
+                    if (obj.name) {
+                        html += '<strong>Name:</strong> ' + obj.name + '<br>';
+                    }
+                    if (obj.magnification) {
+                        html += '<strong>Magnification:</strong> ' + obj.magnification + 'x<br>';
+                    }
+                    if (obj.numerical_aperture) {
+                        html += '<strong>Numerical Aperture:</strong> ' + obj.numerical_aperture + '<br>';
+                    }
+                    if (obj.zoom_magnification && obj.zoom_magnification !== 1.0) {
+                        html += '<strong>Zoom:</strong> ' + obj.zoom_magnification + 'x<br>';
+                    }
+                    if (obj.immersion_refractive_index) {
+                        html += '<strong>Immersion RI:</strong> ' + obj.immersion_refractive_index + '<br>';
+                    }
+                    if (obj.modality && obj.modality.length > 0) {
+                        html += '<strong>Modality:</strong> ' + obj.modality.join(', ') + '<br>';
+                    }
+                    
+                    html += '</div>';
+                }
+            } else {
+                html += '<strong>❌ No Spatial Calibration</strong><br>';
+                html += '<div style="background-color: #fdf2e9; padding: 8px; border-radius: 4px; margin: 5px 0;">';
+                html += '<em>Spatial calibration metadata not available.</em>';
+                html += '</div>';
+            }
+            
+            html += '</div><br>';
+            
+            // Dimensions information
+            html += '<h4>📐 Dimensions</h4>';
+            html += '<div style="margin-left: 10px;">';
+            const sizes = currentMetadata.sizes;
+            if (sizes.C) html += '<strong>Channels (C):</strong> ' + sizes.C + '<br>';
+            if (sizes.T) html += '<strong>Time Points (T):</strong> ' + sizes.T + '<br>';
+            if (sizes.Z) html += '<strong>Z-Slices (Z):</strong> ' + sizes.Z + '<br>';
+            if (sizes.Y) html += '<strong>Height (Y):</strong> ' + sizes.Y + ' pixels<br>';
+            if (sizes.X) html += '<strong>Width (X):</strong> ' + sizes.X + ' pixels<br>';
+            
+            // Physical dimensions section (ImageJ-style summary)
+            if (currentMetadata.spatial_dimensions) {
+                html += '<br><strong>🗺️ Physical Dimensions:</strong><br>';
+                const spatial = currentMetadata.spatial_dimensions;
+                
+                // Show image type
+                if (spatial.image_type) {
+                    html += '&nbsp;&nbsp;<strong>Type:</strong> ' + spatial.image_type + '<br>';
+                }
+                
+                // Show ImageJ-style calibration summary
+                if (spatial.calibration_summary && spatial.calibration_summary.length > 0) {
+                    html += '<div style="background-color: #e3f2fd; padding: 8px; border-radius: 4px; margin: 5px 0; font-family: monospace; font-size: 12px;">';
+                    spatial.calibration_summary.forEach(function(line) {
+                        html += line + '<br>';
+                    });
+                    html += '</div>';
+                }
+                
+                // Show physical dimensions if pixel size is available
+                if (spatial.width_um !== undefined || spatial.height_um !== undefined) {
+                    if (spatial.width_um !== undefined) {
+                        html += '&nbsp;&nbsp;<strong>Width:</strong> ' + spatial.width_um + ' μm (' + spatial.width_mm + ' mm)<br>';
+                    }
+                    if (spatial.height_um !== undefined) {
+                        html += '&nbsp;&nbsp;<strong>Height:</strong> ' + spatial.height_um + ' μm (' + spatial.height_mm + ' mm)<br>';
+                    }
+                    if (spatial.depth_um !== undefined) {
+                        html += '&nbsp;&nbsp;<strong>Depth:</strong> ' + spatial.depth_um + ' μm (' + spatial.depth_mm + ' mm)<br>';
+                        html += '&nbsp;&nbsp;<strong>Z-step:</strong> ' + spatial.z_step_um + ' μm<br>';
+                    }
+                } else if (spatial.width_pixels !== undefined || spatial.height_pixels !== undefined) {
+                    // Show pixel dimensions if no physical calibration is available
+                    html += '&nbsp;&nbsp;<strong>Pixel Dimensions:</strong><br>';
+                    if (spatial.width_pixels !== undefined) {
+                        html += '&nbsp;&nbsp;&nbsp;&nbsp;<strong>Width:</strong> ' + spatial.width_pixels + ' pixels<br>';
+                    }
+                    if (spatial.height_pixels !== undefined) {
+                        html += '&nbsp;&nbsp;&nbsp;&nbsp;<strong>Height:</strong> ' + spatial.height_pixels + ' pixels<br>';
+                    }
+                    if (spatial.depth_slices !== undefined) {
+                        html += '&nbsp;&nbsp;&nbsp;&nbsp;<strong>Z-slices:</strong> ' + spatial.depth_slices + '<br>';
+                    }
+                    if (spatial.calibration_note) {
+                        html += '&nbsp;&nbsp;<em style="color: #e67e22;">' + spatial.calibration_note + '</em><br>';
+                    } else {
+                        html += '&nbsp;&nbsp;<em style="color: #e67e22;">(Physical size unavailable - no pixel calibration)</em><br>';
+                    }
+                }
+            }
+            
+            // Temporal information section
+            if (currentMetadata.temporal_info) {
+                html += '<br><strong>⏱️ Time Duration:</strong><br>';
+                const temporal = currentMetadata.temporal_info;
+                html += '&nbsp;&nbsp;<strong>Total Timepoints:</strong> ' + temporal.total_timepoints + '<br>';
+                if (temporal.time_interval_s !== 'Unknown') {
+                    html += '&nbsp;&nbsp;<strong>Time Interval:</strong> ' + temporal.time_interval_s + ' s<br>';
+                    html += '&nbsp;&nbsp;<strong>Total Duration:</strong> ' + temporal.total_duration_s + ' s';
+                    if (temporal.total_duration_min < 60) {
+                        html += ' (' + temporal.total_duration_min + ' min)<br>';
+                    } else {
+                        html += ' (' + temporal.total_duration_hr + ' hr)<br>';
+                    }
+                } else {
+                    html += '&nbsp;&nbsp;<strong>Time Interval:</strong> Unknown<br>';
+                }
+            }
+            
+            html += '</div><br>';
+            
+            // Channel details
+            if (currentMetadata.channel_details && currentMetadata.channel_details.length > 0) {
+                html += '<h4>🎨 Channel Information</h4>';
+                html += '<div style="margin-left: 10px;">';
+                currentMetadata.channel_details.forEach(function(ch) {
+                    html += '<strong>Channel ' + (ch.index + 1) + ':</strong><br>';
+                    html += '&nbsp;&nbsp;Name: ' + ch.name + '<br>';
+                    if (ch.emission_wavelength && ch.emission_wavelength !== 'Unknown') {
+                        html += '&nbsp;&nbsp;Emission: ' + ch.emission_wavelength + ' nm<br>';
+                    }
+                    if (ch.excitation_wavelength && ch.excitation_wavelength !== 'Unknown') {
+                        html += '&nbsp;&nbsp;Excitation: ' + ch.excitation_wavelength + ' nm<br>';
+                    }
+                    if (ch.color && ch.color !== 'Unknown') {
+                        html += '&nbsp;&nbsp;Color: ' + ch.color + '<br>';
+                    }
+                    html += '<br>';
+                });
+                html += '</div>';
+            }
+            
+            // Acquisition information - cleaned up
+            let hasAcquisitionInfo = false;
+            let acqHtml = '<h4>⏰ Acquisition Details</h4>';
+            acqHtml += '<div style="margin-left: 10px;">';
+            
+            // Date - prioritize acquisition_date over text_info.date
+            let acqDate = null;
+            if (currentMetadata.acquisition_date && currentMetadata.acquisition_date !== 'Unknown') {
+                acqDate = currentMetadata.acquisition_date;
+            } else if (currentMetadata.text_info && currentMetadata.text_info.date && currentMetadata.text_info.date !== 'Unknown') {
+                acqDate = currentMetadata.text_info.date;
+            }
+            
+            if (acqDate) {
+                acqHtml += '<strong>Date:</strong> ' + acqDate + '<br>';
+                hasAcquisitionInfo = true;
+            }
+            
+            // Software information - only show if meaningful
+            if (currentMetadata.text_info && currentMetadata.text_info.capturing_software && 
+                currentMetadata.text_info.capturing_software !== 'Unknown') {
+                acqHtml += '<strong>Software:</strong> ' + currentMetadata.text_info.capturing_software;
+                if (currentMetadata.text_info.capture_software_version && 
+                    currentMetadata.text_info.capture_software_version !== 'Unknown') {
+                    acqHtml += ' v' + currentMetadata.text_info.capture_software_version;
+                }
+                acqHtml += '<br>';
+                hasAcquisitionInfo = true;
+            }
+            
+            // Parse and show useful description info - but hide the raw dump
+            if (currentMetadata.text_info && currentMetadata.text_info.description && 
+                currentMetadata.text_info.description !== 'Unknown' && 
+                currentMetadata.text_info.description.trim() !== '') {
+                
+                const desc = currentMetadata.text_info.description;
+                
+                // Extract useful information from the description
+                let extractedInfo = {};
+                
+                // Extract camera name
+                const cameraMatch = desc.match(/Camera Name:\s*([^A-Z\n]+?)(?=\s[A-Z]|\n|$)/);
+                if (cameraMatch) {
+                    extractedInfo.camera = cameraMatch[1].trim();
+                }
+                
+                // Extract microscope name
+                const microscopeMatch = desc.match(/Microscope:\s*([^A-Z\n]+?)(?=\s[A-Z]|\n|$)/);
+                if (microscopeMatch) {
+                    extractedInfo.microscope = microscopeMatch[1].trim();
+                }
+                
+                // Extract numerical aperture
+                const naMatch = desc.match(/Numerical Aperture:\s*([\d.]+)/);
+                if (naMatch) {
+                    extractedInfo.numericalAperture = naMatch[1];
+                }
+                
+                // Extract time loop info
+                const timeLoopMatch = desc.match(/Time Loop:\s*(\d+)\s*-\s*.*?Period\s*(\d+)\s*ms/);
+                if (timeLoopMatch) {
+                    const frames = timeLoopMatch[1];
+                    const periodMs = parseInt(timeLoopMatch[2]);
+                    extractedInfo.timeFrames = frames;
+                    extractedInfo.timePeriod = periodMs / 1000; // Convert to seconds
+                }
+                
+                // Extract channel names
+                const channelMatches = desc.match(/Name:\s*([^C\n]+?)(?=\sComponent|\n|$)/g);
+                if (channelMatches) {
+                    extractedInfo.channels = channelMatches.map(match => 
+                        match.replace('Name:', '').trim()
+                    ).filter(name => name && name !== 'Unknown');
+                }
+                
+                // Show extracted info cleanly
+                if (extractedInfo.camera) {
+                    acqHtml += '<strong>Camera:</strong> ' + extractedInfo.camera + '<br>';
+                    hasAcquisitionInfo = true;
+                }
+                if (extractedInfo.microscope) {
+                    acqHtml += '<strong>Microscope:</strong> ' + extractedInfo.microscope + '<br>';
+                    hasAcquisitionInfo = true;
+                }
+                if (extractedInfo.numericalAperture) {
+                    acqHtml += '<strong>Numerical Aperture:</strong> ' + extractedInfo.numericalAperture + '<br>';
+                    hasAcquisitionInfo = true;
+                }
+                if (extractedInfo.timeFrames && extractedInfo.timePeriod) {
+                    acqHtml += '<strong>Time Series:</strong> ' + extractedInfo.timeFrames + ' frames @ ' + extractedInfo.timePeriod + 's intervals<br>';
+                    hasAcquisitionInfo = true;
+                }
+                if (extractedInfo.channels && extractedInfo.channels.length > 0) {
+                    acqHtml += '<strong>Channels:</strong> ' + extractedInfo.channels.join(', ') + '<br>';
+                    hasAcquisitionInfo = true;
+                }
+            }
+            
+            acqHtml += '</div><br>';
+            
+            // Only add the section if we have meaningful acquisition info
+            if (hasAcquisitionInfo) {
+                html += acqHtml;
+            }
+            
+            // Objective information - cleaned up
+            if (currentMetadata.objectives && currentMetadata.objectives.length > 0) {
+                let hasObjInfo = false;
+                let objHtml = '<h4>🔬 Objective Information</h4>';
+                objHtml += '<div style="margin-left: 10px;">';
+                
+                currentMetadata.objectives.forEach(function(obj, i) {
+                    let hasThisObjInfo = false;
+                    let thisObjHtml = '<strong>Objective ' + (i + 1) + ':</strong><br>';
+                    
+                    if (obj.name && obj.name !== 'Unknown') {
+                        thisObjHtml += '&nbsp;&nbsp;Name: ' + obj.name + '<br>';
+                        hasThisObjInfo = true;
+                    }
+                    if (obj.magnification && obj.magnification !== 'Unknown') {
+                        thisObjHtml += '&nbsp;&nbsp;Magnification: ' + obj.magnification + 'x<br>';
+                        hasThisObjInfo = true;
+                    }
+                    if (obj.numerical_aperture && obj.numerical_aperture !== 'Unknown') {
+                        thisObjHtml += '&nbsp;&nbsp;NA: ' + obj.numerical_aperture + '<br>';
+                        hasThisObjInfo = true;
+                    }
+                    
+                    if (hasThisObjInfo) {
+                        objHtml += thisObjHtml + '<br>';
+                        hasObjInfo = true;
+                    }
+                });
+                
+                objHtml += '</div>';
+                
+                if (hasObjInfo) {
+                    html += objHtml;
+                }
+            }
+            
+            // Camera/exposure information - cleaned up
+            if (currentMetadata.frame_channel_info && currentMetadata.frame_channel_info.length > 0) {
+                let hasCameraInfo = false;
+                let cameraHtml = '<h4>📷 Camera & Exposure</h4>';
+                cameraHtml += '<div style="margin-left: 10px;">';
+                
+                currentMetadata.frame_channel_info.forEach(function(ch, i) {
+                    let hasChannelInfo = false;
+                    let channelHtml = '<strong>Channel ' + (i + 1) + ':</strong><br>';
+                    
+                    if (ch.exposure_time_ms && ch.exposure_time_ms !== 'Unknown') {
+                        channelHtml += '&nbsp;&nbsp;Exposure: ' + ch.exposure_time_ms + ' ms<br>';
+                        hasChannelInfo = true;
+                    }
+                    if (ch.camera && ch.camera !== 'Unknown') {
+                        channelHtml += '&nbsp;&nbsp;Camera: ' + ch.camera + '<br>';
+                        hasChannelInfo = true;
+                    }
+                    if (ch.microscope_name && ch.microscope_name !== 'Unknown') {
+                        channelHtml += '&nbsp;&nbsp;Microscope: ' + ch.microscope_name + '<br>';
+                        hasChannelInfo = true;
+                    }
+                    
+                    if (hasChannelInfo) {
+                        cameraHtml += channelHtml + '<br>';
+                        hasCameraInfo = true;
+                    }
+                });
+                
+                cameraHtml += '</div>';
+                
+                if (hasCameraInfo) {
+                    html += cameraHtml;
+                }
+            }
+            
+            // Experiment information - cleaned up
+            if (currentMetadata.experiment && currentMetadata.experiment.length > 0) {
+                let hasExpInfo = false;
+                let expHtml = '<h4>🧪 Experiment</h4>';
+                expHtml += '<div style="margin-left: 10px;">';
+                
+                currentMetadata.experiment.forEach(function(exp) {
+                    if (exp.type && exp.type !== 'Unknown') {
+                        expHtml += '<strong>' + exp.type + ':</strong>';
+                        if (exp.count && exp.count !== 'Unknown') {
+                            expHtml += ' ' + exp.count;
+                        }
+                        expHtml += '<br>';
+                        hasExpInfo = true;
+                        
+                        // Only show parameters if they contain meaningful data
+                        if (exp.parameters && Object.keys(exp.parameters).length > 0) {
+                            let paramStr = '';
+                            for (let key in exp.parameters) {
+                                if (exp.parameters[key] !== 'Unknown' && exp.parameters[key] !== null) {
+                                    paramStr += key + ': ' + exp.parameters[key] + ', ';
+                                }
+                            }
+                            if (paramStr.length > 0) {
+                                paramStr = paramStr.slice(0, -2); // Remove trailing comma
+                                expHtml += '&nbsp;&nbsp;Parameters: ' + paramStr + '<br>';
+                            }
+                        }
+                    }
+                });
+                
+                expHtml += '</div><br>';
+                
+                if (hasExpInfo) {
+                    html += expHtml;
+                }
+            }
+            
+            // Technical details (for advanced users)
+            html += '<details style="margin-top: 15px;"><summary><strong>🔧 Technical Details</strong></summary>';
+            html += '<div style="margin-left: 10px; margin-top: 10px;">';
+            html += '<strong>Raw Dimensions:</strong> ' + JSON.stringify(currentMetadata.sizes) + '<br>';
+            html += '<strong>Array Shape:</strong> ' + currentMetadata.shape.join(' × ') + '<br>';
+            html += '<strong>Data Type:</strong> ' + currentMetadata.dtype + '<br>';
+            html += '<strong>Number of Dimensions:</strong> ' + currentMetadata.ndim + '<br>';
+            
+            if (currentMetadata.text_info && currentMetadata.text_info.optics !== 'Unknown') {
+                html += '<strong>Optics Config:</strong> ' + currentMetadata.text_info.optics + '<br>';
+            }
+            
+            if (currentMetadata.metadata_error) {
+                html += '<br><strong style="color: #e74c3c;">Metadata Error:</strong> ' + currentMetadata.metadata_error + '<br>';
+            }
+            
+            // Add raw description to technical details
+            if (currentMetadata.text_info && currentMetadata.text_info.description && 
+                currentMetadata.text_info.description !== 'Unknown' && 
+                currentMetadata.text_info.description.trim() !== '') {
+                html += '<br><strong>Raw Description (Full):</strong><br>';
+                html += '<div style="max-height: 150px; overflow-y: auto; font-size: 10px; background: #f8f9fa; padding: 5px; border-radius: 3px; white-space: pre-wrap; word-wrap: break-word;">';
+                html += currentMetadata.text_info.description;
+                html += '</div>';
+            }
+            
+            html += '</div>';
+            html += '</details>';
+            
+            metadataDiv.innerHTML = html;
+        }
+        
+        function toggleMetadata() {
+            const metadataDiv = document.getElementById('metadata');
+            if (metadataDiv.classList.contains('hidden')) {
+                showMetadata();
+            } else {
+                metadataDiv.classList.add('hidden');
+            }
+        }
+
+        function showStatus(message, type) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = 'status ' + type;
+            status.style.display = 'block';
+            
+            if (type === 'success') {
+                setTimeout(function() {
+                    status.style.display = 'none';
+                }, 3000);
+            }
+        }
+        
+        function shutdownServer() {
+            if (confirm('Are you sure you want to quit the ND2 Viewer?\n\nThis will shut down the server and close the application.')) {
+                showStatus('Shutting down ND2 Viewer...', 'success');
+                
+                // Send shutdown request
+                fetch('/shutdown', {
+                    method: 'POST'
+                })
+                .then(response => {
+                    if (response.ok) {
+                        // Show goodbye message
+                        document.body.innerHTML = `
+                            <div style="display: flex; align-items: center; justify-content: center; height: 100vh; background: #2c3e50; color: white; font-family: Arial, sans-serif; text-align: center;">
+                                <div>
+                                    <h1>🛑 ND2 Viewer Stopped</h1>
+                                    <p style="font-size: 18px; margin: 20px 0;">The server has been shut down successfully.</p>
+                                    <p style="color: #bdc3c7;">You can close this browser tab.</p>
+                                </div>
+                            </div>
+                        `;
+                        
+                        // Try to close the tab after a delay (may not work due to browser security)
+                        setTimeout(() => {
+                            window.close();
+                        }, 2000);
+                    } else {
+                        showStatus('Failed to shutdown server', 'error');
+                    }
+                })
+                .catch(error => {
+                    // Server likely shut down before responding, which is expected
+                    document.body.innerHTML = `
+                        <div style="display: flex; align-items: center; justify-content: center; height: 100vh; background: #2c3e50; color: white; font-family: Arial, sans-serif; text-align: center;">
+                            <div>
+                                <h1>🛑 ND2 Viewer Stopped</h1>
+                                <p style="font-size: 18px; margin: 20px 0;">The server has been shut down successfully.</p>
+                                <p style="color: #bdc3c7;">You can close this browser tab.</p>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+        }
+    </script>
+</body>
+</html> 
