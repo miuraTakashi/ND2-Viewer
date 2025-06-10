@@ -1,147 +1,144 @@
 #!/usr/bin/env python3
 """
-ND2 Viewer Icon Generator
-Creates a nice icon for the macOS ND2 Viewer application
+Simple ND2 Icon Creator
+Creates a clean, minimalist icon with just "ND2" text on white background
 """
 
 from PIL import Image, ImageDraw, ImageFont
-import math
 import os
 
-def create_nd2_icon():
-    """Create a professional ND2 viewer icon"""
+def create_simple_nd2_icon():
+    """Create a simple ND2 icon with text on white background"""
     
-    # Icon size (1024x1024 for high resolution, will be scaled down)
+    # Create a white square image
     size = 1024
+    image = Image.new('RGBA', (size, size), (255, 255, 255, 255))  # White background
+    draw = ImageDraw.Draw(image)
     
-    # Create image with transparent background
-    img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
+    # Try to use a bold system font, fallback to default if not available
+    font_size = int(size * 0.35)  # 35% of image size
     
-    # Color scheme - scientific/microscopy colors
-    bg_color = (45, 55, 72, 255)      # Dark blue-gray background
-    primary_color = (59, 130, 246, 255)  # Blue (scientific)
-    secondary_color = (16, 185, 129, 255) # Green (cells/biology)
-    accent_color = (245, 101, 101, 255)   # Red (contrast)
-    text_color = (255, 255, 255, 255)     # White text
-    
-    # Draw rounded rectangle background
-    margin = 80
-    corner_radius = 180
-    bg_rect = [margin, margin, size - margin, size - margin]
-    
-    # Draw background with rounded corners
-    draw.rounded_rectangle(bg_rect, radius=corner_radius, fill=bg_color)
-    
-    # Draw microscope lens circles (representing ND2 multi-channel imaging)
-    center_x, center_y = size // 2, size // 2
-    
-    # Main lens circle
-    lens_radius = 180
-    lens_center = (center_x, center_y - 80)
-    draw.ellipse([lens_center[0] - lens_radius, lens_center[1] - lens_radius,
-                  lens_center[0] + lens_radius, lens_center[1] + lens_radius],
-                 outline=primary_color, width=12)
-    
-    # Inner lens details
-    inner_radius = 120
-    draw.ellipse([lens_center[0] - inner_radius, lens_center[1] - inner_radius,
-                  lens_center[0] + inner_radius, lens_center[1] + inner_radius],
-                 outline=secondary_color, width=8)
-    
-    # Lens center
-    center_radius = 60
-    draw.ellipse([lens_center[0] - center_radius, lens_center[1] - center_radius,
-                  lens_center[0] + center_radius, lens_center[1] + center_radius],
-                 fill=accent_color)
-    
-    # Draw channel indicators (3 small circles for 3-channel imaging)
-    channel_radius = 25
-    channel_y = center_y + 160
-    channel_colors = [primary_color, secondary_color, accent_color]
-    
-    for i, color in enumerate(channel_colors):
-        x_offset = (i - 1) * 80  # -80, 0, 80
-        channel_x = center_x + x_offset
-        draw.ellipse([channel_x - channel_radius, channel_y - channel_radius,
-                      channel_x + channel_radius, channel_y + channel_radius],
-                     fill=color)
-    
-    # Draw microscope stand/base
-    stand_width = 40
-    stand_height = 120
-    stand_x = center_x - stand_width // 2
-    stand_y = lens_center[1] + lens_radius - 20
-    draw.rectangle([stand_x, stand_y, stand_x + stand_width, stand_y + stand_height],
-                   fill=primary_color)
-    
-    # Draw microscope eyepiece
-    eyepiece_width = 60
-    eyepiece_height = 30
-    eyepiece_x = center_x - eyepiece_width // 2
-    eyepiece_y = lens_center[1] - lens_radius - 40
-    draw.rectangle([eyepiece_x, eyepiece_y, eyepiece_x + eyepiece_width, eyepiece_y + eyepiece_height],
-                   fill=secondary_color)
-    
-    # Add "ND2" text
     try:
-        # Try to use a system font
-        font_size = 120
+        # Try to use a bold font
         font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", font_size)
     except:
-        # Fallback to default font
-        font = ImageFont.load_default()
+        try:
+            # Fallback to Arial Bold
+            font = ImageFont.truetype("/System/Library/Fonts/Arial Bold.ttf", font_size)
+        except:
+            try:
+                # Another fallback
+                font = ImageFont.truetype("/Library/Fonts/Arial.ttf", font_size)
+            except:
+                # Use default font if no system fonts available
+                font = ImageFont.load_default()
     
+    # Text to draw
     text = "ND2"
-    # Get text bounding box
+    
+    # Get text dimensions
     bbox = draw.textbbox((0, 0), text, font=font)
     text_width = bbox[2] - bbox[0]
     text_height = bbox[3] - bbox[1]
     
-    text_x = center_x - text_width // 2
-    text_y = center_y + 280
+    # Center the text
+    x = (size - text_width) // 2
+    y = (size - text_height) // 2
     
-    # Draw text with shadow
-    shadow_offset = 3
-    draw.text((text_x + shadow_offset, text_y + shadow_offset), text, font=font, fill=(0, 0, 0, 128))
-    draw.text((text_x, text_y), text, font=font, fill=text_color)
+    # Draw the text in dark color for good contrast
+    text_color = (32, 32, 32, 255)  # Dark gray, almost black
+    draw.text((x, y), text, fill=text_color, font=font)
     
-    return img
+    # Add a subtle border for definition
+    border_color = (200, 200, 200, 255)  # Light gray
+    border_width = 2
+    draw.rectangle([0, 0, size-1, size-1], outline=border_color, width=border_width)
+    
+    return image
 
-def save_icon_formats(img, base_name="nd2_icon"):
-    """Save icon in multiple formats and sizes"""
+def create_icon_set():
+    """Create all required icon sizes for macOS"""
     
-    # Common icon sizes for macOS
+    print("🎨 Creating simple ND2 icon...")
+    
+    # Create the base 1024x1024 icon
+    base_icon = create_simple_nd2_icon()
+    
+    # Icon sizes required for macOS
     sizes = [16, 32, 64, 128, 256, 512, 1024]
     
-    # Save as PNG files
-    for size in sizes:
-        resized = img.resize((size, size), Image.Resampling.LANCZOS)
-        resized.save(f"{base_name}_{size}.png")
+    # Create iconset directory
+    iconset_dir = "nd2_icon.iconset"
+    if not os.path.exists(iconset_dir):
+        os.makedirs(iconset_dir)
     
-    # Save original high-res version
-    img.save(f"{base_name}.png")
-    
-    print(f"✅ Created icon files:")
+    # Generate all sizes
     for size in sizes:
-        print(f"   📁 {base_name}_{size}.png")
-    print(f"   📁 {base_name}.png (original)")
+        print(f"  📐 Creating {size}x{size} icon...")
+        
+        # Resize the base icon
+        if size == 1024:
+            resized = base_icon
+        else:
+            resized = base_icon.resize((size, size), Image.Resampling.LANCZOS)
+        
+        # Save standard resolution
+        filename = f"icon_{size}x{size}.png"
+        resized.save(os.path.join(iconset_dir, filename), "PNG")
+        
+        # Save @2x (retina) versions for applicable sizes
+        if size <= 512:
+            retina_filename = f"icon_{size}x{size}@2x.png"
+            retina_size = size * 2
+            if retina_size <= 1024:
+                retina_resized = base_icon.resize((retina_size, retina_size), Image.Resampling.LANCZOS)
+                retina_resized.save(os.path.join(iconset_dir, retina_filename), "PNG")
+    
+    print(f"✅ Icon set created in {iconset_dir}/")
+    return iconset_dir
 
-def main():
-    print("🎨 Creating ND2 Viewer Icon...")
+def convert_to_icns():
+    """Convert the iconset to .icns format using macOS iconutil"""
     
-    # Create the icon
-    icon = create_nd2_icon()
+    iconset_dir = "nd2_icon.iconset"
+    icns_file = "nd2_icon.icns"
     
-    # Save in multiple formats
-    save_icon_formats(icon)
+    print("🔄 Converting to .icns format...")
     
-    print("\n🎉 Icon creation complete!")
-    print("💡 The icon represents:")
-    print("   🔬 Microscope lens (scientific imaging)")
-    print("   🌈 Three colored circles (multi-channel support)")
-    print("   📊 Professional scientific aesthetic")
-    print("   📝 'ND2' text for clear identification")
+    # Use macOS iconutil to convert
+    import subprocess
+    try:
+        result = subprocess.run([
+            "iconutil", "-c", "icns", iconset_dir, "-o", icns_file
+        ], check=True, capture_output=True, text=True)
+        
+        print(f"✅ Created {icns_file}")
+        return icns_file
+        
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Error creating .icns file: {e}")
+        print(f"   stdout: {e.stdout}")
+        print(f"   stderr: {e.stderr}")
+        return None
+    except FileNotFoundError:
+        print("❌ iconutil not found. This script requires macOS to create .icns files.")
+        return None
 
 if __name__ == "__main__":
-    main() 
+    print("🎯 Creating Simple ND2 Icon")
+    print("=" * 40)
+    
+    # Create the icon set
+    iconset_dir = create_icon_set()
+    
+    # Convert to .icns
+    icns_file = convert_to_icns()
+    
+    if icns_file:
+        print("\n🎉 Simple ND2 icon created successfully!")
+        print(f"📁 Icon files: {iconset_dir}/")
+        print(f"🖼️  macOS icon: {icns_file}")
+        print("\nYou can now use this icon for your ND2 Viewer app!")
+    else:
+        print("\n⚠️  Icon PNG files created, but .icns conversion failed.")
+        print("You can still use the PNG files from the iconset directory.") 
