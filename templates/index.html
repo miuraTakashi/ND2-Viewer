@@ -99,10 +99,30 @@
             align-items: center;
             justify-content: center;
             min-height: 400px;
+            position: relative;
+            cursor: grab;
+        }
+        .image-container.panning {
+            cursor: grabbing;
+        }
+        .image-container.zoomed-out {
+            align-items: center;
+            justify-content: center;
         }
         .image-display {
+            transition: transform 0.1s ease;
+            transform-origin: center center;
+            display: block;
+        }
+        .image-display.fit-to-container {
             max-width: 100%;
             max-height: 100%;
+            width: auto;
+            height: auto;
+        }
+        .image-display.fixed-size {
+            max-width: none;
+            max-height: none;
         }
         .metadata {
             font-size: 12px;
@@ -222,6 +242,16 @@
                     <button class="button" onclick="autoContrast()">Auto Contrast</button>
                     
                     <div class="control-group">
+                        <label>Zoom: <span id="zoomLabel">100%</span></label>
+                        <input type="range" id="zoomSlider" class="slider" min="10" max="500" value="100" step="10">
+                        <div style="margin-top: 5px; display: flex; gap: 5px;">
+                            <button class="button" onclick="setZoom('fit')" style="padding: 5px 10px; font-size: 11px;">Fit</button>
+                            <button class="button" onclick="setZoom(100)" style="padding: 5px 10px; font-size: 11px;">1:1</button>
+                            <button class="button" onclick="setZoom(200)" style="padding: 5px 10px; font-size: 11px;">2x</button>
+                        </div>
+                    </div>
+                    
+                    <div class="control-group">
                         <button class="button" onclick="exportFrame()">Export Current Frame</button>
                         <button class="button" onclick="exportChannel()">Export Channel</button>
                         <button class="button" onclick="exportAll()">Export All Channels</button>
@@ -244,7 +274,7 @@
             <div class="main-view">
                 <div id="status" class="status"></div>
                 
-                <div class="image-container">
+                <div class="image-container" id="imageContainer">
                     <img id="imageDisplay" class="image-display hidden" alt="ND2 Image">
                     <div id="placeholder" style="color: #7f8c8d; text-align: center;">
                         <h3>No Image Loaded</h3>
@@ -269,6 +299,14 @@
         
         // Current custom colors (will be initialized from defaults)
         let channelColors = {...defaultChannelColors};
+        
+        // Zoom and pan variables
+        let currentZoom = 100;
+        let isPanning = false;
+        let panStartX = 0;
+        let panStartY = 0;
+        let panOffsetX = 0;
+        let panOffsetY = 0;
         
         // File upload handling
         const fileInput = document.getElementById('fileInput');
@@ -388,10 +426,14 @@
             document.getElementById('contrastMinSlider').addEventListener('input', onContrastChange);
             document.getElementById('contrastMaxSlider').addEventListener('input', onContrastChange);
             document.getElementById('channelColorPicker').addEventListener('input', onColorChange);
+            document.getElementById('zoomSlider').addEventListener('input', onZoomChange);
             
             // Initialize color legend and color picker
             updateColorLegend();
             updateColorPicker();
+            
+            // Setup zoom and pan event handlers
+            setupZoomPanHandlers();
         }
         
         function updateLabel(labelId, current, total) {
@@ -449,6 +491,118 @@
             updateFrame();
         }
         
+        // Zoom and Pan Functions
+        function onZoomChange() {
+            const zoomValue = parseInt(document.getElementById('zoomSlider').value);
+            setZoom(zoomValue);
+        }
+        
+        function setZoom(zoomPercent) {
+            const imageDisplay = document.getElementById('imageDisplay');
+            const imageContainer = document.querySelector('.image-container');
+            
+            if (zoomPercent === 'fit') {
+                // Fit to container - this should fill the available space optimally
+                currentZoom = 'fit';
+                document.getElementById('zoomSlider').value = 100;
+                document.getElementById('zoomLabel').textContent = 'Fit';
+                
+                // Reset classes and transforms
+                imageDisplay.classList.remove('fixed-size');
+                imageDisplay.classList.add('fit-to-container');
+                imageContainer.classList.remove('zoomed-out');
+                imageDisplay.style.transform = 'none';
+                panOffsetX = 0;
+                panOffsetY = 0;
+            } else {
+                // Specific zoom level
+                currentZoom = zoomPercent;
+                document.getElementById('zoomSlider').value = zoomPercent;
+                document.getElementById('zoomLabel').textContent = zoomPercent + '%';
+                
+                // Remove fit-to-container class and apply fixed sizing
+                imageDisplay.classList.remove('fit-to-container');
+                imageDisplay.classList.add('fixed-size');
+                
+                // For zoom levels less than 100%, center the smaller image
+                if (zoomPercent < 100) {
+                    imageContainer.classList.add('zoomed-out');
+                    // Reset pan offset for small images to keep them centered
+                    panOffsetX = 0;
+                    panOffsetY = 0;
+                } else {
+                    imageContainer.classList.remove('zoomed-out');
+                }
+                
+                const scale = zoomPercent / 100;
+                imageDisplay.style.transform = `scale(${scale}) translate(${panOffsetX}px, ${panOffsetY}px)`;
+            }
+        }
+        
+        function resetPan() {
+            panOffsetX = 0;
+            panOffsetY = 0;
+            setZoom(currentZoom);
+        }
+        
+        function setupZoomPanHandlers() {
+            const imageContainer = document.querySelector('.image-container');
+            const imageDisplay = document.getElementById('imageDisplay');
+            
+            // Mouse wheel zoom
+            imageContainer.addEventListener('wheel', function(e) {
+                if (!imageDisplay.src) return;
+                
+                e.preventDefault();
+                const delta = e.deltaY > 0 ? -10 : 10;
+                
+                // If currently in fit mode, start from 100%
+                let baseZoom = currentZoom === 'fit' ? 100 : currentZoom;
+                const newZoom = Math.max(10, Math.min(500, baseZoom + delta));
+                setZoom(newZoom);
+            });
+            
+            // Mouse drag pan
+            imageContainer.addEventListener('mousedown', function(e) {
+                if (!imageDisplay.src || currentZoom === 'fit' || currentZoom <= 100) return;
+                
+                isPanning = true;
+                panStartX = e.clientX - panOffsetX;
+                panStartY = e.clientY - panOffsetY;
+                imageContainer.classList.add('panning');
+                e.preventDefault();
+            });
+            
+            document.addEventListener('mousemove', function(e) {
+                if (!isPanning) return;
+                
+                panOffsetX = e.clientX - panStartX;
+                panOffsetY = e.clientY - panStartY;
+                
+                const scale = currentZoom / 100;
+                imageDisplay.style.transform = `scale(${scale}) translate(${panOffsetX}px, ${panOffsetY}px)`;
+            });
+            
+            document.addEventListener('mouseup', function(e) {
+                if (isPanning) {
+                    isPanning = false;
+                    imageContainer.classList.remove('panning');
+                }
+            });
+            
+            // Double-click to fit/zoom
+            imageContainer.addEventListener('dblclick', function(e) {
+                if (!imageDisplay.src) return;
+                
+                if (currentZoom === 'fit' || currentZoom === 100) {
+                    setZoom(200); // Zoom to 200% on double-click
+                } else {
+                    setZoom('fit'); // Reset to fit
+                    resetPan();
+                }
+            });
+        }
+        
         function updateNavigationLabels() {
             const sizes = currentMetadata.sizes;
             
@@ -503,6 +657,11 @@
                     imageDisplay.src = data.image_data;
                     imageDisplay.classList.remove('hidden');
                     placeholder.style.display = 'none';
+                    
+                    // Set initial zoom to fit when image first loads
+                    imageDisplay.onload = function() {
+                        setZoom('fit');
+                    };
                 } else {
                     showStatus(data.error, 'error');
                 }
