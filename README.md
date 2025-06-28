@@ -41,14 +41,18 @@ pip install -r requirements.txt
 
 ### 2. Run the Viewer
 ```bash
-python web_nd2_viewer_simple.py
+# Option 1: Direct execution
+python3 web_nd2_viewer_simple.py
+
+# Option 2: Using convenience script
+./start.sh
 ```
 
 ### 3. Open Your Browser
 Navigate to http://127.0.0.1:5001 and upload your ND2 file.
 
 ### 4. macOS App (Optional)
-For macOS users, double-click `ND2 Viewer.app` for a native desktop experience.
+For macOS users, double-click `app/ND2 Viewer.app` for a native desktop experience.
 
 ## File Structure
 
@@ -58,13 +62,20 @@ ND2Viewer/
 ├── templates/
 │   └── index.html              # Web interface template
 ├── requirements.txt            # Python dependencies
-├── stop_nd2_viewer.sh         # Shutdown script
-├── ND2 Viewer.app/            # macOS application bundle
-├── create_mac_app.sh          # macOS app builder
-├── create_icon.py             # Icon generator
-├── launch_nd2_viewer.applescript # macOS app launcher
-├── nd2_icon.icns              # macOS app icon
-├── MAC_APP_README.md          # macOS app documentation
+├── start.sh                   # Quick start script
+├── stop.sh                    # Quick stop script
+├── scripts/                   # Utility scripts
+│   ├── stop_nd2_viewer.sh     # Shutdown script
+│   ├── create_mac_app.sh      # macOS app builder
+│   └── launch_nd2_viewer.applescript # macOS app launcher
+├── app/                       # macOS application
+│   └── ND2 Viewer.app/        # macOS application bundle
+├── assets/                    # Resources
+│   ├── nd2_icon.icns          # macOS app icon
+│   └── create_icon.py         # Icon generator
+├── docs/                      # Documentation
+│   ├── MAC_APP_README.md      # macOS app documentation
+│   └── GITHUB_SETUP.md        # GitHub setup guide
 └── README.md                  # This file
 ```
 
@@ -88,7 +99,8 @@ ND2Viewer/
 ### Shutdown Options
 - **Auto-shutdown**: The server automatically shuts down when you close the browser window/tab ✨
 - **Quit Button**: Use the red "🛑 Quit ND2 Viewer" button in the web interface
-- **Terminal Script**: Run `./stop_nd2_viewer.sh` to stop all ND2 viewer processes
+- **Convenience Script**: Run `./stop.sh` from project root
+- **Terminal Script**: Run `./scripts/stop_nd2_viewer.sh` to stop all ND2 viewer processes
 - **Keyboard**: Press Ctrl+C in the terminal where you started the server
 
 ### Auto-Shutdown Feature ✨
@@ -136,12 +148,12 @@ The ND2 Viewer now **automatically shuts down** when you close the browser windo
 ## macOS Desktop App
 
 The project includes a native macOS application:
-- **Double-click to launch**: `ND2 Viewer.app`
+- **Double-click to launch**: `app/ND2 Viewer.app`
 - **Custom microscopy icon**: Professional scientific appearance
 - **Auto-launches web server**: No terminal required
 - **Desktop integration**: Appears in Dock and Applications folder
 
-See `MAC_APP_README.md` for detailed macOS app information.
+See `docs/MAC_APP_README.md` for detailed macOS app information.
 
 ## Scientific Applications
 

@@ -10,8 +10,10 @@ on run
         set appPath to (path to me) as string
         set appPosixPath to POSIX path of appPath
         
-        -- Remove "/ND2 Viewer.app" from the end to get project directory
-        set projectDirectory to (do shell script "dirname " & quoted form of appPosixPath)
+        -- Remove "/app/ND2 Viewer.app" from the end to get project directory
+        -- First remove the app name, then remove the app directory
+        set appDirectory to (do shell script "dirname " & quoted form of appPosixPath)
+        set projectDirectory to (do shell script "dirname " & quoted form of appDirectory)
         
         -- Define paths
         set pythonPath to "/Users/miura/.pyenv/versions/3.11.5/envs/LatestStable/bin/python"

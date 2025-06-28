@@ -9,31 +9,32 @@ echo "🔨 Creating ND2 Viewer macOS Application..."
 APP_NAME="ND2 Viewer"
 APP_BUNDLE="${APP_NAME}.app"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
-# Remove existing app bundle if it exists
-if [ -d "$APP_BUNDLE" ]; then
+# Remove existing app bundle if it exists in app directory
+if [ -d "$PROJECT_ROOT/app/$APP_BUNDLE" ]; then
     echo "📁 Removing existing application bundle..."
-    rm -rf "$APP_BUNDLE"
+    rm -rf "$PROJECT_ROOT/app/$APP_BUNDLE"
 fi
 
 # Compile AppleScript to application
 echo "⚙️  Compiling AppleScript..."
-osacompile -o "$APP_BUNDLE" "$SCRIPT_DIR/launch_nd2_viewer.applescript"
+osacompile -o "$PROJECT_ROOT/app/$APP_BUNDLE" "$SCRIPT_DIR/launch_nd2_viewer.applescript"
 
 # Check if compilation was successful
-if [ ! -d "$APP_BUNDLE" ]; then
+if [ ! -d "$PROJECT_ROOT/app/$APP_BUNDLE" ]; then
     echo "❌ Failed to create application bundle"
     exit 1
 fi
 
 # Create Contents/Resources directory if it doesn't exist
 echo "🎨 Setting up application icon..."
-RESOURCES_DIR="$APP_BUNDLE/Contents/Resources"
+RESOURCES_DIR="$PROJECT_ROOT/app/$APP_BUNDLE/Contents/Resources"
 mkdir -p "$RESOURCES_DIR"
 
 # Copy our custom icon if it exists
-if [ -f "$SCRIPT_DIR/nd2_icon.icns" ]; then
-    cp "$SCRIPT_DIR/nd2_icon.icns" "$RESOURCES_DIR/applet.icns"
+if [ -f "$PROJECT_ROOT/assets/nd2_icon.icns" ]; then
+    cp "$PROJECT_ROOT/assets/nd2_icon.icns" "$RESOURCES_DIR/applet.icns"
     echo "   ✅ Custom ND2 icon installed"
 else
     echo "   ⚠️  Custom icon not found, using default"
@@ -41,7 +42,7 @@ fi
 
 # Create/update Info.plist with proper icon reference
 echo "📝 Updating application metadata..."
-INFO_PLIST="$APP_BUNDLE/Contents/Info.plist"
+INFO_PLIST="$PROJECT_ROOT/app/$APP_BUNDLE/Contents/Info.plist"
 
 # Update the Info.plist to include icon and better metadata
 /usr/libexec/PlistBuddy -c "Set :CFBundleIconFile applet.icns" "$INFO_PLIST" 2>/dev/null || \
@@ -64,7 +65,7 @@ INFO_PLIST="$APP_BUNDLE/Contents/Info.plist"
 
 # Set permissions
 echo "🔧 Setting permissions..."
-chmod +x "$APP_BUNDLE/Contents/MacOS/applet"
+chmod +x "$PROJECT_ROOT/app/$APP_BUNDLE/Contents/MacOS/applet"
 
 # Create desktop shortcut
 echo "🖥️  Creating desktop shortcut..."
@@ -72,7 +73,7 @@ DESKTOP_PATH="$HOME/Desktop/$APP_BUNDLE"
 if [ -L "$DESKTOP_PATH" ] || [ -d "$DESKTOP_PATH" ]; then
     rm -rf "$DESKTOP_PATH"
 fi
-ln -s "$SCRIPT_DIR/$APP_BUNDLE" "$DESKTOP_PATH"
+ln -s "$PROJECT_ROOT/app/$APP_BUNDLE" "$DESKTOP_PATH"
 
 # Clean up temporary files
 echo "🧹 Cleaning up..."
@@ -82,7 +83,7 @@ rm -f nd2_icon_*.png
 echo
 echo "✅ ND2 Viewer application created successfully!"
 echo
-echo "📍 Application Location: $SCRIPT_DIR/$APP_BUNDLE"
+echo "📍 Application Location: $PROJECT_ROOT/app/$APP_BUNDLE"
 echo "🖥️  Desktop Shortcut: $DESKTOP_PATH"
 echo "🎨 Icon: Custom ND2 microscopy icon installed"
 echo
