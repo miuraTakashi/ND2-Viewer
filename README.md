@@ -86,9 +86,17 @@ ND2Viewer/
 - **Export**: Save individual frames or entire channel datasets
 
 ### Shutdown Options
+- **Auto-shutdown**: The server automatically shuts down when you close the browser window/tab ✨
 - **Quit Button**: Use the red "🛑 Quit ND2 Viewer" button in the web interface
 - **Terminal Script**: Run `./stop_nd2_viewer.sh` to stop all ND2 viewer processes
 - **Keyboard**: Press Ctrl+C in the terminal where you started the server
+
+### Auto-Shutdown Feature ✨
+The ND2 Viewer now **automatically shuts down** when you close the browser window or tab:
+- **Instant shutdown**: Detects window closing and immediately stops the server
+- **Heartbeat monitoring**: Backup system monitors browser connection every 15 seconds
+- **Clean exit**: Properly closes files and frees resources
+- **No background processes**: Server won't keep running after you're done viewing
 
 ## Technical Details
 

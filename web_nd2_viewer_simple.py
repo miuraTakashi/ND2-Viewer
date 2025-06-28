@@ -26,6 +26,7 @@ app.secret_key = 'nd2_viewer_secret_key'
 current_nd2_file = None
 current_file_path = None
 current_metadata = {}
+last_heartbeat_time = None
 
 def hex_to_rgb(hex_color):
     """Convert hex color to RGB tuple"""
@@ -592,6 +593,14 @@ def get_metadata():
     except Exception as e:
         return jsonify({'error': f'Failed to get metadata: {str(e)}'}), 500
 
+@app.route('/heartbeat', methods=['POST'])
+def heartbeat():
+    """Heartbeat endpoint to keep the server alive while browser is active"""
+    global last_heartbeat_time
+    import time
+    last_heartbeat_time = time.time()
+    return jsonify({'status': 'alive'}), 200
+
 @app.route('/shutdown', methods=['POST'])
 def shutdown_server():
     """Shutdown the Flask server"""
@@ -602,7 +611,15 @@ def shutdown_server():
             current_nd2_file.close()
             current_nd2_file = None
         
-        print("🛑 Shutdown requested from web interface...")
+        # Check if this is an auto-shutdown from browser closing
+        is_auto_shutdown = (request.content_type and 'multipart/form-data' in request.content_type) or \
+                          request.headers.get('User-Agent', '').startswith('Mozilla') and not request.is_json
+        
+        if is_auto_shutdown:
+            print("🛑 Browser window closed - auto-shutting down ND2 Viewer...")
+        else:
+            print("🛑 Shutdown requested from web interface...")
+        
         print("✅ ND2 Viewer shutting down gracefully.")
         
         # For development server, we can use this approach
@@ -627,11 +644,46 @@ def shutdown_server():
         print(f"Error during shutdown: {e}")
         return jsonify({'error': f'Shutdown failed: {str(e)}'}), 500
 
+def monitor_heartbeat():
+    """Monitor heartbeat and shutdown if browser disconnects"""
+    global last_heartbeat_time
+    import time
+    import os
+    import signal
+    
+    # Wait for initial connection
+    time.sleep(5)
+    
+    while True:
+        time.sleep(10)  # Check every 10 seconds
+        
+        if last_heartbeat_time is not None:
+            current_time = time.time()
+            # If no heartbeat for 30 seconds, assume browser is closed
+            if current_time - last_heartbeat_time > 30:
+                print("🛑 No heartbeat from browser for 30 seconds - shutting down ND2 Viewer...")
+                
+                # Close any open ND2 file
+                global current_nd2_file
+                if current_nd2_file is not None:
+                    current_nd2_file.close()
+                    current_nd2_file = None
+                
+                print("✅ ND2 Viewer shutting down due to browser disconnect.")
+                os.kill(os.getpid(), signal.SIGTERM)
+                break
+
 def main():
     """Main entry point"""
-    print("Starting ND2 Web Viewer...")
-    print("The viewer will open in your web browser.")
-    print("Press Ctrl+C to stop the server.")
+    print("🔬 Starting ND2 Web Viewer...")
+    print("📱 The viewer will open in your web browser at http://127.0.0.1:5001")
+    print("✨ Auto-shutdown enabled: Server will stop when you close the browser window")
+    print("⌨️  Press Ctrl+C to stop the server manually")
+    
+    # Start heartbeat monitor in a separate thread
+    heartbeat_thread = threading.Thread(target=monitor_heartbeat)
+    heartbeat_thread.daemon = True
+    heartbeat_thread.start()
     
     # Start browser in a separate thread
     def open_browser():

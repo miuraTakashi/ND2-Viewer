@@ -1031,34 +1031,18 @@
         function shutdownServer() {
             if (confirm('Are you sure you want to quit the ND2 Viewer?\n\nThis will shut down the server and close the application.')) {
                 showStatus('Shutting down ND2 Viewer...', 'success');
-                
-                // Send shutdown request
-                fetch('/shutdown', {
-                    method: 'POST'
-                })
-                .then(response => {
-                    if (response.ok) {
-                        // Show goodbye message
-                        document.body.innerHTML = `
-                            <div style="display: flex; align-items: center; justify-content: center; height: 100vh; background: #2c3e50; color: white; font-family: Arial, sans-serif; text-align: center;">
-                                <div>
-                                    <h1>🛑 ND2 Viewer Stopped</h1>
-                                    <p style="font-size: 18px; margin: 20px 0;">The server has been shut down successfully.</p>
-                                    <p style="color: #bdc3c7;">You can close this browser tab.</p>
-                                </div>
-                            </div>
-                        `;
-                        
-                        // Try to close the tab after a delay (may not work due to browser security)
-                        setTimeout(() => {
-                            window.close();
-                        }, 2000);
-                    } else {
-                        showStatus('Failed to shutdown server', 'error');
-                    }
-                })
-                .catch(error => {
-                    // Server likely shut down before responding, which is expected
+                performShutdown();
+            }
+        }
+
+        function performShutdown() {
+            // Send shutdown request
+            fetch('/shutdown', {
+                method: 'POST'
+            })
+            .then(response => {
+                if (response.ok) {
+                    // Show goodbye message
                     document.body.innerHTML = `
                         <div style="display: flex; align-items: center; justify-content: center; height: 100vh; background: #2c3e50; color: white; font-family: Arial, sans-serif; text-align: center;">
                             <div>
@@ -1068,9 +1052,107 @@
                             </div>
                         </div>
                     `;
+                    
+                    // Try to close the tab after a delay (may not work due to browser security)
+                    setTimeout(() => {
+                        window.close();
+                    }, 2000);
+                } else {
+                    showStatus('Failed to shutdown server', 'error');
+                }
+            })
+            .catch(error => {
+                // Server likely shut down before responding, which is expected
+                document.body.innerHTML = `
+                    <div style="display: flex; align-items: center; justify-content: center; height: 100vh; background: #2c3e50; color: white; font-family: Arial, sans-serif; text-align: center;">
+                        <div>
+                            <h1>🛑 ND2 Viewer Stopped</h1>
+                            <p style="font-size: 18px; margin: 20px 0;">The server has been shut down successfully.</p>
+                            <p style="color: #bdc3c7;">You can close this browser tab.</p>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        // Auto-shutdown when browser window/tab is closed
+        let isShuttingDown = false;
+        let heartbeatInterval;
+        
+        // Start heartbeat to keep server alive while browser is active
+        function startHeartbeat() {
+            // Send initial heartbeat
+            sendHeartbeat();
+            
+            // Send heartbeat every 15 seconds
+            heartbeatInterval = setInterval(sendHeartbeat, 15000);
+        }
+        
+        function sendHeartbeat() {
+            if (!isShuttingDown) {
+                fetch('/heartbeat', {
+                    method: 'POST'
+                }).catch(() => {
+                    // Ignore heartbeat errors
                 });
             }
         }
+        
+        function stopHeartbeat() {
+            if (heartbeatInterval) {
+                clearInterval(heartbeatInterval);
+                heartbeatInterval = null;
+            }
+        }
+        
+        // Start heartbeat when page loads
+        window.addEventListener('load', startHeartbeat);
+        
+        window.addEventListener('beforeunload', function(e) {
+            if (!isShuttingDown) {
+                isShuttingDown = true;
+                stopHeartbeat();
+                
+                // Send shutdown request when window is being closed
+                // Use sendBeacon for reliability during page unload
+                if (navigator.sendBeacon) {
+                    navigator.sendBeacon('/shutdown', new FormData());
+                } else {
+                    // Fallback for browsers that don't support sendBeacon
+                    fetch('/shutdown', {
+                        method: 'POST',
+                        keepalive: true
+                    }).catch(() => {
+                        // Ignore errors during shutdown
+                    });
+                }
+            }
+        });
+
+        // Additional cleanup on page hide (for mobile/tablet support)
+        window.addEventListener('pagehide', function(e) {
+            if (!isShuttingDown) {
+                isShuttingDown = true;
+                stopHeartbeat();
+                
+                if (navigator.sendBeacon) {
+                    navigator.sendBeacon('/shutdown', new FormData());
+                }
+            }
+        });
+        
+        // Stop heartbeat when page becomes hidden (tab switching, minimizing)
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                // Page is hidden, but don't shutdown immediately
+                // The heartbeat monitor will handle shutdown if page stays hidden too long
+            } else {
+                // Page is visible again, ensure heartbeat is running
+                if (!isShuttingDown && !heartbeatInterval) {
+                    startHeartbeat();
+                }
+            }
+        });
     </script>
 </body>
 </html> 
